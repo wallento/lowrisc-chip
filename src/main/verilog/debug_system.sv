@@ -53,8 +53,8 @@ module debug_system
           .fifo_out_data  (fifo_out.data[15:0]),
           .fifo_out_valid (fifo_out.valid),
           .fifo_out_ready (fifo_out.ready),
-          .uart_rx (uart_rx),
-          .uart_tx (uart_tx),
+          .uart_rx (rx),
+          .uart_tx (tx),
           .uart_cts (1),
           .uart_rts (),
           .error ());
