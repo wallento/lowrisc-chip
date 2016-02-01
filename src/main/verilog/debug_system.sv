@@ -41,7 +41,7 @@ module debug_system
    logic  logic_rst, com_rst;
  
    glip_uart_toplevel
-     #(.WIDTH(16), .BAUD(3000000), .FREQ(25000000))
+     #(.WIDTH(16), .BAUD(1000000), .FREQ(25000000))
    u_glip(.clk_io    (clk),
           .clk_logic (clk),
           .rst       (rst),
@@ -55,30 +55,34 @@ module debug_system
           .fifo_out_ready (fifo_out.ready),
           .uart_rx (rx),
           .uart_tx (tx),
-          .uart_cts (1),
+          .uart_cts (0),
           .uart_rts (),
           .error ());
 
       localparam N = 3;
 
-   /* Modules->Ring */
-   dii_channel in_ports [N-1:0] ();
-   /* Ring->Modules */
-   dii_channel out_ports [N-1:0] ();   
+   dii_flit [N-1:0] dii_out; logic [N-1:0] dii_out_ready;
+   dii_flit [N-1:0] dii_in; logic [N-1:0] dii_in_ready;   
    
    osd_him
      u_him(.*,
            .glip_in  (fifo_in),
            .glip_out (fifo_out),
-           .dii_out  (out_ports[0]),
-           .dii_in   (in_ports[0]));
+           .dii_out        ( dii_out[0]        ),
+           .dii_out_ready  ( dii_out_ready[0]  ),
+           .dii_in         ( dii_in[0]         ),
+           .dii_in_ready   ( dii_in_ready[0]   )
+           );
    
    osd_scm
      #(.SYSTEMID(16'hdead), .NUM_MOD(N-1))
    u_scm(.*,
          .id (10'd1),
-         .debug_in  (in_ports[1]),
-         .debug_out (out_ports[1]));
+         .debug_in        ( dii_in[1]        ),
+         .debug_in_ready  ( dii_in_ready[1]  ),
+         .debug_out       ( dii_out[1]       ),
+         .debug_out_ready ( dii_out_ready[1] )
+         );
 
    assign uart_r_data[31:8] = 0;
    
@@ -103,36 +107,20 @@ module debug_system
              .b_ready (uart_b_ready),
              .b_resp (uart_b_resp),
              
-             .debug_in  (in_ports[2]),
-             .debug_out (out_ports[2]));
+             .debug_in        ( dii_in[2]        ),
+             .debug_in_ready  ( dii_in_ready[2]  ),
+             .debug_out       ( dii_out[2]       ),
+             .debug_out_ready ( dii_out_ready[2] )
+             );
    
-   dii_channel #(.N(N)) dii_in ();
-   dii_channel #(.N(N)) dii_out ();
-
-   genvar i;
-   generate
-      for (i = 0; i < N; i++) begin
-         assign out_ports[i].ready = dii_out.assemble(out_ports[i].data,
-                                                      out_ports[i].last,
-                                                      out_ports[i].valid,
-                                                      i);
-         // here is a bug for Verilator,it cannot recognize in_port[i] as an interface
-         //assign dii_in.ready[i] = in_ports[i].assemble(dii_in.data[i],
-         //                                              dii_in.last[i],
-         //                                              dii_in.valid[i]);
-         assign in_ports[i].data = dii_in.data[i];
-         assign in_ports[i].last = dii_in.last[i];
-         assign in_ports[i].valid = dii_in.valid[i];
-         assign dii_in.ready[i] = in_ports[i].ready;
-      end
-   endgenerate
-
-
    debug_ring
      #(.PORTS(N))
-   u_ring(.*,
-          .dii_in  (dii_out),
-          .dii_out (dii_in));
+             u_ring(.*,
+                    .dii_in        ( dii_out       ),
+                    .dii_in_ready  ( dii_out_ready ),
+                    .dii_out       ( dii_in        ),
+                    .dii_out_ready ( dii_in_ready  )
+                    );
 
    
 endmodule // debug_system
